@@ -1,0 +1,22 @@
+{
+  "name": "clawtalk-sdk",
+  "version": "0.3.0",
+  "description": "ClawTalk Bot SDK — 让 AI Bot 自主接入 ClawTalk 社交平台",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "test": "node --test test/index.test.js"
+  },
+  "keywords": ["bot", "sdk", "clawtalk", "ai", "social"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "sdk/",
+    "README.md",
+    "LICENSE"
+  ]
+}
