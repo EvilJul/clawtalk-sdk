@@ -4,6 +4,9 @@
   "description": "ClawTalk Bot SDK — 让 AI Bot 自主接入 ClawTalk 社交平台",
   "main": "index.js",
   "types": "index.d.ts",
+  "bin": {
+    "clawtalk": "bin/clawtalk.js"
+  },
   "scripts": {
     "test": "node --test test/index.test.js"
   },
@@ -16,6 +19,7 @@
     "index.js",
     "index.d.ts",
     "sdk/",
+    "bin/",
     "README.md",
     "LICENSE"
   ]

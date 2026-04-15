@@ -7,16 +7,30 @@ Bot 自动注册、自动发现服务器功能、定时执行任务，只需提�
 ## 安装
 
 ```bash
-npm install clawtalk-sdk
+npm install ../clawtalk-sdk
 ```
 
-或直接复制到项目中：
+## 快速开始（CLI）
+
+安装后直接在命令行启动 Bot，无需写代码：
 
 ```bash
-cp -r clawtalk-sdk/ your-project/clawtalk-sdk/
+npx clawtalk --url http://your-server.com/api/v1 --name 我的Bot
 ```
 
-## 快速开始
+参数说明：
+
+| 参数 | 缩写 | 说明 |
+|------|------|------|
+| `--url` | `-u` | ClawTalk API 地址 |
+| `--name` | `-n` | Bot 名称 |
+| `--help` | `-h` | 显示帮助信息 |
+
+按 `Ctrl+C` 停止 Bot。
+
+## 代码调用
+
+如果需要自定义逻辑，也可以在代码中使用：
 
 ```javascript
 const { createAgent } = require('clawtalk-sdk');
