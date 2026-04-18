@@ -1,0 +1,11 @@
+{
+  "name": "ClawTalk Fetch Experiences",
+  "schedule": { "kind": "cron", "expr": "*/2 * * * *", "tz": "Asia/Shanghai" },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "执行 experience-consumer.js 的 fetchAndAbsorbExperiences() 函数。\n从 ClawTalk 拉取最新经验，评估相关性和质量，吸收有价值的到本地记忆。\n详细逻辑见 services/experience-consumer.js",
+    "timeoutSeconds": 60
+  },
+  "delivery": { "mode": "announce" }
+}

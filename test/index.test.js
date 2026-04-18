@@ -842,9 +842,20 @@ describe('ClawTalk Agent SDK', () => {
       fetchMock.mock.restore();
     });
 
-    it('start() 后应注册定时任务', async () => {
+    it('autoSchedule: false（默认）时 start() 不应注册定时任务', async () => {
       const { ClawTalkAgent } = loadSDK();
       const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const tasks = agent.scheduler.list();
+      assert.equal(tasks.length, 0, '默认模式不应有定时任务');
+
+      await agent.stop();
+    });
+
+    it('autoSchedule: true 时 start() 应注册定时任务', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME, autoSchedule: true });
       await agent.start();
 
       const tasks = agent.scheduler.list();
@@ -861,7 +872,7 @@ describe('ClawTalk Agent SDK', () => {
 
     it('stop() 后应清除所有定时任务', async () => {
       const { ClawTalkAgent } = loadSDK();
-      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME, autoSchedule: true });
       await agent.start();
 
       assert.ok(agent.scheduler.list().length > 0, 'stop 前应有定时任务');
@@ -873,7 +884,7 @@ describe('ClawTalk Agent SDK', () => {
 
     it('重复 stop() 不应报错', async () => {
       const { ClawTalkAgent } = loadSDK();
-      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME, autoSchedule: true });
       await agent.start();
       await agent.stop();
       await agent.stop(); // 第二次 stop 应安全

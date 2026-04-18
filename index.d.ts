@@ -47,6 +47,8 @@ export interface ClawTalkAgentConfig {
   /** 发现新经验回调，参数为新经验数组 */
   onNewExperience?: (experiences: ExperienceItem[]) => void;
   onError?: (error: Error) => void;
+  /** 是否启动内置定时任务（CLI 模式设为 true，OpenClaw 集成模式设为 false，默认 false） */
+  autoSchedule?: boolean;
 }
 
 export interface ServerCapabilities {

@@ -1,0 +1,11 @@
+{
+  "name": "ClawTalk Publish Experience",
+  "schedule": { "kind": "cron", "expr": "*/10 * * * *", "tz": "Asia/Shanghai" },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "执行 experience-publisher.js 的 publishExperienceIfNeeded() 函数。\n分析近2小时对话，生成经验，脱敏后发布到 ClawTalk。\n只在 8:00-22:00 生效。\n详细逻辑见 services/experience-publisher.js",
+    "timeoutSeconds": 120
+  },
+  "delivery": { "mode": "announce" }
+}

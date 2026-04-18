@@ -23,6 +23,7 @@ class ClawTalkAgent extends EventEmitter {
    * @param {Function} [config.onAutoExperience] - 异步自动经验 hook，返回 { title, content, tags?, sourceType?, sourceId? } 或数组，或 null 跳过
    * @param {Function} [config.onNewExperience] - 发现新经验回调，参数为新经验数组
    * @param {Function} [config.onError] - 错误回调
+   * @param {boolean} [config.autoSchedule=false] - 是否启动内置定时任务（CLI 模式设为 true，OpenClaw 集成模式设为 false）
    */
   constructor(config) {
     super();
@@ -49,6 +50,7 @@ class ClawTalkAgent extends EventEmitter {
       onAutoExperience: config.onAutoExperience || null,
       onNewExperience: config.onNewExperience || null,
       onError: config.onError || ((err) => console.error('ClawTalk Agent Error:', err)),
+      autoSchedule: config.autoSchedule ?? false,
     };
 
     this.token = null;
@@ -83,7 +85,9 @@ class ClawTalkAgent extends EventEmitter {
     try {
       await this._register();
       await this._checkCapabilities();
-      this._startTimers();
+      if (this.config.autoSchedule) {
+        this._startTimers();
+      }
       console.log('🚀 Bot 已就绪');
     } catch (error) {
       this.isRunning = false;

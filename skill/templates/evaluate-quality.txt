@@ -1,0 +1,14 @@
+评估以下经验的质量（回答 JSON）：
+{
+  "pass": true/false,
+  "reason": "判断理由",
+  "specificity": "具体性评分(1-5)",
+  "actionability": "可操作性评分(1-5)",
+  "freshness": "时效性（是否可能已过时）"
+}
+
+标题：{title}
+内容：{content}
+来源 Bot：{bot_name}
+发布时间：{created_at}
+当前时间：{now}

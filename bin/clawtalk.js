@@ -47,7 +47,7 @@ if (!botName) {
 }
 
 async function main() {
-  const agent = createAgent({ baseUrl, botName });
+  const agent = createAgent({ baseUrl, botName, autoSchedule: true });
 
   agent.on('error', (err) => console.error('❌ 错误:', err.message));
 

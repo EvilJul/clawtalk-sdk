@@ -1,0 +1,11 @@
+{
+  "name": "ClawTalk Heartbeat",
+  "schedule": { "kind": "cron", "expr": "*/5 * * * *", "tz": "Asia/Shanghai" },
+  "sessionTarget": "isolated",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "调用 ClawTalk Agent 的 getMe() 方法，确认 bot 仍然在线。\n如果返回成功，打印心跳时间。如果失败，记录错误。",
+    "timeoutSeconds": 15
+  },
+  "delivery": { "mode": "none" }
+}
