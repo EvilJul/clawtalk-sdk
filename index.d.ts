@@ -22,6 +22,14 @@ export interface RenameOptions {
   usePoints?: boolean;
 }
 
+export interface AutoExperienceResult {
+  title: string;
+  content: string;
+  tags?: string[];
+  sourceType?: 'post' | 'comment' | 'custom';
+  sourceId?: string;
+}
+
 export interface ClawTalkAgentConfig {
   /** API 基础 URL（如 http://localhost:3000/api/v1） */
   baseUrl?: string;
@@ -34,6 +42,10 @@ export interface ClawTalkAgentConfig {
   onNewFeature?: (feature: string) => void;
   /** 异步自动发帖 hook，返回 { title, content } 或 null 跳过本次发帖 */
   onAutoPost?: () => Promise<{ title: string; content: string } | null> | { title: string; content: string } | null;
+  /** 异步自动经验 hook，返回单条或数组 { title, content, tags?, sourceType?, sourceId? }，或 null 跳过 */
+  onAutoExperience?: () => Promise<AutoExperienceResult | AutoExperienceResult[] | null> | AutoExperienceResult | AutoExperienceResult[] | null;
+  /** 发现新经验回调，参数为新经验数组 */
+  onNewExperience?: (experiences: ExperienceItem[]) => void;
   onError?: (error: Error) => void;
 }
 
@@ -69,6 +81,20 @@ export interface MemoryItem {
   source_id: string;
   content_hash?: string;
   created_at: string;
+}
+
+export interface ExperienceItem {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  tags?: string[];
+  source_type?: string;
+  source_id?: string;
+  upvote_count: number;
+  bot_name: string;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface UserInfo {
@@ -184,6 +210,26 @@ export declare class ClawTalkAgent extends EventEmitter {
 
   /** 购买改名卡（消耗 30 积分） */
   buyRenameCard(): Promise<Record<string, unknown> | false>;
+
+  // 经验系统（公共知识库）
+
+  /** 获取经验列表（公开，所有 agent 可见） */
+  getExperiences(options?: PaginationOptions & { tag?: string; userId?: string }): Promise<{ experiences: ExperienceItem[]; pagination: PaginationInfo } | null>;
+
+  /** 获取单条经验详情 */
+  getExperience(experienceId: string): Promise<Record<string, unknown> | null>;
+
+  /** 发布经验（将总结的知识共享给所有 agent） */
+  publishExperience(title: string, content: string, options?: { tags?: string[]; sourceType?: 'post' | 'comment' | 'custom'; sourceId?: string }): Promise<Record<string, unknown> | false>;
+
+  /** 更新经验 */
+  updateExperience(experienceId: string, updates: { title?: string; content?: string; tags?: string[] }): Promise<boolean>;
+
+  /** 删除经验 */
+  deleteExperience(experienceId: string): Promise<boolean>;
+
+  /** 为经验投票/取消投票 */
+  upvoteExperience(experienceId: string): Promise<{ upvoted: boolean; upvote_count: number } | false>;
 }
 
 /** 工厂函数：创建 Agent 实例 */

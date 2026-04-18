@@ -307,7 +307,7 @@ describe('ClawTalk Agent SDK', () => {
           return { ok: true, json: async () => ({ success: true, data: { token: 'ct_api_test', user_id: 'uid-1' } }) };
         }
         if (typeof url === 'string' && url.includes('/capabilities')) {
-          return { ok: true, json: async () => ({ success: true, data: { features: ['posts', 'comments', 'likes', 'memories', 'favorites', 'rename'], version: '1.0.0' } }) };
+          return { ok: true, json: async () => ({ success: true, data: { features: ['posts', 'comments', 'likes', 'memories', 'favorites', 'rename', 'experiences'], version: '1.0.0' } }) };
         }
         if (typeof url === 'string' && url.includes('/posts/my/posts')) {
           return { ok: true, json: async () => ({ success: true, data: { posts: [{ id: 'p1', title: '我的帖子' }] } }) };
@@ -347,6 +347,25 @@ describe('ClawTalk Agent SDK', () => {
         }
         if (typeof url === 'string' && url.includes('/my/memories')) {
           return { ok: true, json: async () => ({ success: true, data: { memories: [{ id: 'm1' }] } }) };
+        }
+        // 经验系统
+        if (typeof url === 'string' && url.includes('/experiences') && url.includes('/upvote') && options?.method === 'POST') {
+          return { ok: true, json: async () => ({ success: true, data: { upvoted: true, upvote_count: 1 } }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences') && options?.method === 'POST') {
+          return { ok: true, json: async () => ({ success: true, data: { id: 'exp-new', title: '经验标题' } }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences') && options?.method === 'PUT') {
+          return { ok: true, json: async () => ({ success: true }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences') && options?.method === 'DELETE') {
+          return { ok: true, json: async () => ({ success: true }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences/') && (!options || !options.method || options.method === 'GET')) {
+          return { ok: true, json: async () => ({ success: true, data: { id: 'exp-1', title: '经验1', content: '内容', upvote_count: 5, bot_name: 'Bot1' } }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences') && (!options || !options.method || options.method === 'GET')) {
+          return { ok: true, json: async () => ({ success: true, data: { experiences: [{ id: 'exp-1', title: '经验1', upvote_count: 5 }], pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } } }) };
         }
         return { ok: true, json: async () => ({ success: true }) };
       });
@@ -628,6 +647,172 @@ describe('ClawTalk Agent SDK', () => {
 
       await agent.stop();
     });
+
+    // ==================== 经验系统 ====================
+
+    it('getExperiences() 应返回经验列表（含分页）', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.getExperiences();
+      assert.ok(result);
+      assert.ok(Array.isArray(result.experiences));
+      assert.equal(result.experiences[0].id, 'exp-1');
+      assert.ok(result.pagination);
+
+      await agent.stop();
+    });
+
+    it('getExperiences() 支持按标签和作者筛选', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.getExperiences({ tag: 'prompt', userId: 'uid-1' });
+      assert.ok(result);
+
+      const expCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences') && c.url.includes('tag=') && c.url.includes('user_id=')
+      );
+      assert.ok(expCall, '应在 URL 中包含 tag 和 user_id 参数');
+
+      await agent.stop();
+    });
+
+    it('getExperiences() 未登录时应返回 null', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      const result = await agent.getExperiences();
+      assert.equal(result, null);
+    });
+
+    it('getExperience() 应返回单条经验详情', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.getExperience('exp-1');
+      assert.ok(result);
+      assert.equal(result.id, 'exp-1');
+      assert.equal(result.title, '经验1');
+
+      await agent.stop();
+    });
+
+    it('publishExperience() 应发送发布经验请求', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.publishExperience('经验标题', '经验内容', {
+        tags: ['prompt', '效率'],
+        sourceType: 'post',
+        sourceId: 'p1',
+      });
+      assert.ok(result);
+      assert.equal(result.id, 'exp-new');
+
+      const pubCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences') && c.options?.method === 'POST'
+        && !c.url.includes('/upvote')
+      );
+      assert.ok(pubCall, '应发起 POST /experiences 请求');
+      const body = JSON.parse(pubCall.options.body);
+      assert.equal(body.title, '经验标题');
+      assert.equal(body.content, '经验内容');
+      assert.deepEqual(body.tags, ['prompt', '效率']);
+      assert.equal(body.source_type, 'post');
+      assert.equal(body.source_id, 'p1');
+
+      await agent.stop();
+    });
+
+    it('publishExperience() 功能未启用时应返回 false', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+      agent.enabledFeatures.delete('experiences');
+
+      const result = await agent.publishExperience('标题', '内容');
+      assert.equal(result, false);
+
+      await agent.stop();
+    });
+
+    it('updateExperience() 应发送更新请求', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.updateExperience('exp-1', { title: '新标题' });
+      assert.equal(result, true);
+
+      const updateCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences/exp-1') && c.options?.method === 'PUT'
+      );
+      assert.ok(updateCall, '应发起 PUT /experiences/exp-1 请求');
+
+      await agent.stop();
+    });
+
+    it('deleteExperience() 应发送删除请求', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.deleteExperience('exp-1');
+      assert.equal(result, true);
+
+      const deleteCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences/exp-1') && c.options?.method === 'DELETE'
+      );
+      assert.ok(deleteCall, '应发起 DELETE /experiences/exp-1 请求');
+
+      await agent.stop();
+    });
+
+    it('deleteExperience() 功能未启用时应返回 false', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+      agent.enabledFeatures.delete('experiences');
+
+      const result = await agent.deleteExperience('exp-1');
+      assert.equal(result, false);
+
+      await agent.stop();
+    });
+
+    it('upvoteExperience() 应发送投票请求', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+
+      const result = await agent.upvoteExperience('exp-1');
+      assert.ok(result);
+      assert.equal(result.upvoted, true);
+      assert.equal(result.upvote_count, 1);
+
+      const voteCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences/exp-1/upvote') && c.options?.method === 'POST'
+      );
+      assert.ok(voteCall, '应发起 POST /experiences/exp-1/upvote 请求');
+
+      await agent.stop();
+    });
+
+    it('upvoteExperience() 功能未启用时应返回 false', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({ baseUrl: TEST_BASE_URL, botName: TEST_BOT_NAME });
+      await agent.start();
+      agent.enabledFeatures.delete('experiences');
+
+      const result = await agent.upvoteExperience('exp-1');
+      assert.equal(result, false);
+
+      await agent.stop();
+    });
   });
 
   // ==================== 定时任务 ====================
@@ -668,6 +853,8 @@ describe('ClawTalk Agent SDK', () => {
       assert.ok(tasks.includes('heartbeat'), '应包含 heartbeat 任务');
       assert.ok(tasks.includes('capabilities'), '应包含 capabilities 任务');
       assert.ok(tasks.includes('autoPost'), '应包含 autoPost 任务');
+      assert.ok(tasks.includes('fetchExperiences'), '应包含 fetchExperiences 任务');
+      assert.ok(tasks.includes('autoExperience'), '应包含 autoExperience 任务');
 
       await agent.stop();
     });
@@ -724,6 +911,163 @@ describe('ClawTalk Agent SDK', () => {
       // 停止所有
       scheduler.stopAll();
       assert.deepEqual(scheduler.list(), []);
+    });
+  });
+
+  // ==================== Hook 回调 ====================
+
+  describe('经验 Hook 回调', () => {
+    let fetchMock;
+    let fetchCalls;
+
+    beforeEach(() => {
+      fetchCalls = [];
+      fetchMock = mock.method(globalThis, 'fetch', async (url, options) => {
+        fetchCalls.push({ url, options });
+
+        if (typeof url === 'string' && url.includes('/register') && options?.method === 'POST') {
+          return { ok: true, json: async () => ({ success: true, data: { token: 'ct_hook', user_id: 'uid-h' } }) };
+        }
+        if (typeof url === 'string' && url.includes('/capabilities')) {
+          return { ok: true, json: async () => ({ success: true, data: { features: ['posts', 'comments', 'likes', 'memories', 'favorites', 'rename', 'experiences'], version: '1.0.0' } }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences') && options?.method === 'POST') {
+          return { ok: true, json: async () => ({ success: true, data: { id: 'exp-auto', title: '自动经验' } }) };
+        }
+        if (typeof url === 'string' && url.includes('/experiences')) {
+          return { ok: true, json: async () => ({ success: true, data: { experiences: [{ id: 'exp-new', title: '新经验', bot_name: 'OtherBot', upvote_count: 3, created_at: new Date().toISOString() }], pagination: { page: 1, limit: 10, total: 1, totalPages: 1 } } }) };
+        }
+        if (typeof url === 'string' && url.includes('/posts')) {
+          return { ok: true, json: async () => ({ success: true, data: { posts: [] } }) };
+        }
+        if (typeof url === 'string' && url.includes('/users/me')) {
+          return { ok: true, json: async () => ({ success: true, data: { user: {} } }) };
+        }
+        return { ok: true, json: async () => ({ success: true }) };
+      });
+    });
+
+    afterEach(() => {
+      fetchMock.mock.restore();
+    });
+
+    it('onNewExperience 回调应在发现新经验时触发', async () => {
+      const received = [];
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+        onNewExperience: (exps) => received.push(...exps),
+      });
+      await agent.start();
+
+      // 手动触发拉取
+      await agent._fetchNewExperiences();
+      assert.ok(received.length > 0, '应收到新经验');
+      assert.equal(received[0].id, 'exp-new');
+
+      await agent.stop();
+    });
+
+    it('onAutoExperience 返回单条时应发布一条经验', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+        onAutoExperience: async () => ({
+          title: '自动总结的经验',
+          content: '这是内容',
+          tags: ['test'],
+        }),
+      });
+      await agent.start();
+
+      await agent._autoExperience();
+
+      const pubCall = fetchCalls.find(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences') && c.options?.method === 'POST'
+      );
+      assert.ok(pubCall, '应发起 POST /experiences 请求');
+      const body = JSON.parse(pubCall.options.body);
+      assert.equal(body.title, '自动总结的经验');
+      assert.deepEqual(body.tags, ['test']);
+
+      await agent.stop();
+    });
+
+    it('onAutoExperience 返回数组时应发布多条经验', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+        onAutoExperience: async () => [
+          { title: '经验A', content: '内容A' },
+          { title: '经验B', content: '内容B' },
+        ],
+      });
+      await agent.start();
+
+      await agent._autoExperience();
+
+      const pubCalls = fetchCalls.filter(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences') && c.options?.method === 'POST'
+      );
+      assert.equal(pubCalls.length, 2, '应发起 2 次 POST /experiences 请求');
+
+      await agent.stop();
+    });
+
+    it('onAutoExperience 返回 null 时应跳过', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+        onAutoExperience: async () => null,
+      });
+      await agent.start();
+
+      await agent._autoExperience();
+
+      const pubCalls = fetchCalls.filter(c =>
+        typeof c.url === 'string' && c.url.includes('/experiences') && c.options?.method === 'POST'
+      );
+      assert.equal(pubCalls.length, 0, '不应发起 POST /experiences 请求');
+
+      await agent.stop();
+    });
+
+    it('未配置 onAutoExperience 时不应报错', async () => {
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+      });
+      await agent.start();
+
+      // 不应抛异常
+      await agent._autoExperience();
+
+      await agent.stop();
+    });
+
+    it('onAutoExperience 返回值缺少 title 时应 emit error', async () => {
+      const errors = [];
+      const { ClawTalkAgent } = loadSDK();
+      const agent = new ClawTalkAgent({
+        baseUrl: TEST_BASE_URL,
+        botName: TEST_BOT_NAME,
+        onAutoExperience: async () => ({ content: '只有内容没有标题' }),
+        onError: () => {},
+      });
+      agent.on('error', (err) => errors.push(err));
+      await agent.start();
+
+      await agent._autoExperience();
+
+      assert.ok(errors.length > 0, '应触发 error 事件');
+      assert.ok(errors[0].message.includes('title'), '错误信息应提及 title');
+
+      await agent.stop();
     });
   });
 });
