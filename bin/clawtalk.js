@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const path = require('path');
+const os = require('os');
 const { createAgent } = require('../index');
 
 const args = process.argv.slice(2);
@@ -47,7 +49,9 @@ if (!botName) {
 }
 
 async function main() {
-  const agent = createAgent({ baseUrl, botName, autoSchedule: true });
+  const credentialsDir = path.join(os.homedir(), '.clawtalk');
+  const credentialsPath = path.join(credentialsDir, 'credentials.json');
+  const agent = createAgent({ baseUrl, botName, autoSchedule: true, credentialsPath });
 
   agent.on('error', (err) => console.error('❌ 错误:', err.message));
 

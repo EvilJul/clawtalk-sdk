@@ -7,6 +7,8 @@
  */
 
 const EventEmitter = require('events');
+const fs = require('fs');
+const path = require('path');
 const { ClawTalkClient } = require('./client');
 const { Scheduler } = require('./scheduler');
 
@@ -51,6 +53,7 @@ class ClawTalkAgent extends EventEmitter {
       onNewExperience: config.onNewExperience || null,
       onError: config.onError || ((err) => console.error('ClawTalk Agent Error:', err)),
       autoSchedule: config.autoSchedule ?? false,
+      credentialsPath: config.credentialsPath || null,
     };
 
     this.token = null;
@@ -108,10 +111,83 @@ class ClawTalkAgent extends EventEmitter {
     console.log('✅ Bot 已停止');
   }
 
+  // ==================== 凭证持久化 ====================
+
+  /** @private 加载本地保存的凭证 */
+  _loadCredentials() {
+    const filePath = this.config.credentialsPath;
+    if (!filePath) return null;
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        if (raw.token && raw.botName === this.config.botName && raw.baseUrl === this.config.baseUrl) {
+          return raw;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /** @private 保存凭证到本地 */
+  _saveCredentials() {
+    const filePath = this.config.credentialsPath;
+    if (!filePath) return;
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify({
+        botName: this.config.botName,
+        baseUrl: this.config.baseUrl,
+        token: this.token,
+        userId: this.userId,
+        savedAt: new Date().toISOString(),
+      }, null, 2));
+    } catch (err) {
+      console.log(`⚠️ 凭证保存失败: ${err.message}`);
+    }
+  }
+
+  /** @private 清除本地凭证 */
+  _clearCredentials() {
+    const filePath = this.config.credentialsPath;
+    if (!filePath) return;
+    try {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    } catch (_) {}
+  }
+
   // ==================== 自动注册 ====================
+
+  /** @private 验证已保存的 token 是否仍然有效 */
+  async _validateToken(token) {
+    this.client.setToken(token);
+    try {
+      const data = await this.client.get('/users/me');
+      if (data.success && data.data.user) {
+        return data.data.user;
+      }
+    } catch (_) {}
+    this.client.setToken(null);
+    return null;
+  }
 
   /** @private */
   async _register() {
+    // 1. 尝试复用本地保存的凭证
+    const saved = this._loadCredentials();
+    if (saved) {
+      console.log('🔑 发现已保存的凭证，正在验证...');
+      const user = await this._validateToken(saved.token);
+      if (user) {
+        this.token = saved.token;
+        this.userId = saved.userId || user.id;
+        console.log(`✅ 凭证有效，已登录: ${user.bot_name}`);
+        return { botName: user.bot_name, token: this.token, userId: this.userId };
+      }
+      console.log('⚠️ 已保存的凭证已失效，将重新注册');
+      this._clearCredentials();
+    }
+
+    // 2. 凭证不存在或已失效，走注册流程
     console.log('📝 正在自主注册...');
 
     try {
@@ -122,7 +198,6 @@ class ClawTalkAgent extends EventEmitter {
         this.userId = data.data.userId || null;
         this.client.setToken(this.token);
 
-        // 若服务端未返回 userId，通过 /users/me 获取
         if (!this.userId) {
           try {
             const me = await this.client.get('/users/me');
@@ -130,6 +205,7 @@ class ClawTalkAgent extends EventEmitter {
           } catch (_) {}
         }
 
+        this._saveCredentials();
         console.log(`✅ 注册成功: ${this.config.botName}`);
 
         if (typeof this.config.onRegister === 'function') {

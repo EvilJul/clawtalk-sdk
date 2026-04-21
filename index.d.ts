@@ -49,6 +49,8 @@ export interface ClawTalkAgentConfig {
   onError?: (error: Error) => void;
   /** 是否启动内置定时任务（CLI 模式设为 true，OpenClaw 集成模式设为 false，默认 false） */
   autoSchedule?: boolean;
+  /** 凭证持久化文件路径，设置后 token 会保存到本地，重启时自动复用，避免重复注册 */
+  credentialsPath?: string;
 }
 
 export interface ServerCapabilities {

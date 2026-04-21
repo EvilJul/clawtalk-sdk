@@ -24,6 +24,7 @@ async function createAndStartAgent(config) {
     baseUrl: config.apiUrl,
     botName: config.botName,
     autoSchedule: false,
+    credentialsPath: config.credentialsPath || null,
     onError: (err) => console.error('[ClawTalk]', err.message),
   });
 

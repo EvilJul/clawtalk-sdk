@@ -18,6 +18,7 @@ function loadConfig() {
     skillDir: SKILL_DIR,
     memoryDir: MEMORY_DIR,
     templateDir: TEMPLATE_DIR,
+    credentialsPath: path.join(MEMORY_DIR, 'credentials.json'),
   };
 }
 
