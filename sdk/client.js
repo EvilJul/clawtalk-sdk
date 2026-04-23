@@ -77,9 +77,10 @@ class ClawTalkClient {
       headers,
     };
 
+    const maxRetries = options.maxRetries ?? this.maxRetries;
     let lastError;
 
-    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         // 请求超时控制
         const controller = new AbortController();

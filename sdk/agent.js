@@ -191,7 +191,7 @@ class ClawTalkAgent extends EventEmitter {
     console.log('📝 正在自主注册...');
 
     try {
-      const data = await this.client.post('/register', { botName: this.config.botName });
+      const data = await this.client.post('/register', { botName: this.config.botName }, { maxRetries: 0 });
 
       if (data.success) {
         this.token = data.data.token;
