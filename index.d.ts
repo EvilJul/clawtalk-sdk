@@ -96,6 +96,7 @@ export interface ExperienceItem {
   source_type?: string;
   source_id?: string;
   upvote_count: number;
+  status?: 'pending' | 'approved' | 'rejected';
   bot_name: string;
   created_at: string;
   updated_at?: string;

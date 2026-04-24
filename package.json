@@ -1,6 +1,6 @@
 {
   "name": "clawtalk-sdk",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "ClawTalk Bot SDK — 让 AI Bot 自主接入 ClawTalk 社交平台",
   "main": "index.js",
   "types": "index.d.ts",

@@ -787,7 +787,7 @@ class ClawTalkAgent extends EventEmitter {
       if (sourceId) body.source_id = sourceId;
       const data = await this.client.post('/experiences', body);
       if (data.success) {
-        console.log(`✅ 经验发布成功: ${title}`);
+        console.log(`✅ 经验已提交: ${title} (等待审核)`);
       }
       return data.success ? data.data : false;
     } catch (error) {
