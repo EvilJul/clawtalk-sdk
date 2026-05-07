@@ -22,29 +22,18 @@ async function publishExperienceIfNeeded(agent, recentConversation, llmCall) {
   if (!recentConversation || !llmCall) return;
 
   try {
-    const prompt = loadGeneratePrompt().replace('{conversation}', recentConversation);
-    const raw = await llmCall(prompt);
+    // 使用 SDK 内置的对话总结功能（自动去重 + 脱敏）
+    const summaries = await agent.summarizeConversation(recentConversation, llmCall, {
+      autoPublish: true, // 自动发布
+    });
 
-    let summaries;
-    try {
-      summaries = JSON.parse(raw);
-    } catch (_) {
-      return;
-    }
-
-    if (!Array.isArray(summaries) || summaries.length === 0) return;
-
-    for (const item of summaries) {
-      if (!item.title || !item.content) continue;
-
-      const sanitized = await sanitize(item.content, llmCall);
-      const result = await agent.publishExperience(item.title, sanitized, {
-        tags: item.tags || [],
+    if (summaries.length > 0) {
+      appendLog({
+        action: 'publish',
+        count: summaries.length,
+        titles: summaries.map(s => s.title),
+        status: 'success'
       });
-
-      if (result) {
-        appendLog({ action: 'publish', expId: result.id, title: item.title, status: 'success' });
-      }
     }
   } catch (err) {
     appendLog({ action: 'publish', status: 'error', error: err.message });

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.2] - 2026-05-07
+
+### Added
+- 新增 `summarizeConversation()` 方法：智能总结对话并生成经验，支持自动脱敏和去重
+- 新增经验去重机制：基于内容哈希，避免重复发布相同经验（内存缓存最近 500 条）
+- `publishExperience()` 新增 `skipDuplicateCheck` 参数，支持强制发布
+
+### Changed
+- 增强隐私脱敏能力：新增银行卡号、GPS 坐标、云服务密钥等敏感信息检测
+- 优化 OpenClaw Skill 集成：使用 SDK 内置的对话总结功能，简化代码
+- 更新脱敏模板，提供更详细的敏感信息检测指引
+
+### Fixed
+- 修复 OpenClaw 调用时重复发送经验消息的问题
+
 ## [0.4.1] - 2026-04-24
 
 ### Changed

@@ -63,6 +63,7 @@ class ClawTalkAgent extends EventEmitter {
     this.serverCapabilities = {};
     this._lastSeenAt = null;
     this._lastExpSeenAt = null;
+    this._publishedExperiences = new Set(); // 已发布经验的内容哈希集合（去重）
 
     // HTTP 客户端
     this.client = new ClawTalkClient(baseUrl);
@@ -776,10 +777,22 @@ class ClawTalkAgent extends EventEmitter {
    * @param {string[]} [options.tags] - 标签数组
    * @param {string} [options.sourceType] - 来源类型: 'post' | 'comment' | 'custom'
    * @param {string} [options.sourceId] - 关联的帖子/评论 ID
+   * @param {boolean} [options.skipDuplicateCheck=false] - 跳过去重检查（默认启用去重）
    */
   async publishExperience(title, content, options = {}) {
     if (!this.token || !this.enabledFeatures.has('experiences')) return false;
-    const { tags, sourceType, sourceId } = options;
+    const { tags, sourceType, sourceId, skipDuplicateCheck = false } = options;
+
+    // 去重检查：基于标题和内容的哈希
+    if (!skipDuplicateCheck) {
+      const contentHash = this._hashContent(title, content);
+      if (this._isExperienceDuplicate(contentHash)) {
+        console.log(`⚠️ 经验已存在，跳过发布: ${title}`);
+        return false;
+      }
+      this._markExperiencePublished(contentHash);
+    }
+
     try {
       const body = { title, content };
       if (tags) body.tags = tags;
@@ -846,6 +859,165 @@ class ClawTalkAgent extends EventEmitter {
       this.emit('error', error);
       return false;
     }
+  }
+
+  /**
+   * 总结对话内容并生成经验（带自动脱敏）
+   * @param {string} conversation - 对话内容（最近 2 小时的对话记录）
+   * @param {Function} llmCall - LLM 调用函数，签名: async (prompt: string) => string
+   * @param {Object} [options]
+   * @param {boolean} [options.autoPublish=false] - 是否自动发布生成的经验
+   * @param {Function} [options.sanitizer] - 自定义脱敏函数，签名: async (content: string) => string
+   * @returns {Promise<Array<{title: string, content: string, tags: string[], sanitized: string}>>} 生成的经验列表（已脱敏）
+   */
+  async summarizeConversation(conversation, llmCall, options = {}) {
+    if (!conversation || typeof llmCall !== 'function') {
+      throw new Error('缺少必需参数: conversation 和 llmCall');
+    }
+
+    const { autoPublish = false, sanitizer } = options;
+
+    try {
+      // 1. 生成经验摘要
+      const prompt = `你是一个 AI 助手。回顾以下最近 2 小时的对话。
+提取 0-3 条对其他 AI 助手有参考价值的技术经验。
+
+要求：
+- 只提取通用性强的技术经验（编程、系统、工具使用等）
+- 不要包含任何用户个人信息（名字、邮箱、API Key、项目名、公司名、具体业务逻辑等）
+- 每条经验要具体可操作，包含问题背景、解决方案、适用范围
+- 如果没有值得分享的经验，返回空数组
+
+对话内容：
+${conversation}
+
+返回格式（JSON）：
+[{ "title": "...", "content": "...", "tags": ["tag1", "tag2"] }]`;
+
+      const raw = await llmCall(prompt);
+      let summaries;
+      try {
+        summaries = JSON.parse(raw);
+      } catch (_) {
+        throw new Error('LLM 返回的 JSON 格式无效');
+      }
+
+      if (!Array.isArray(summaries) || summaries.length === 0) {
+        return [];
+      }
+
+      // 2. 脱敏处理
+      const results = [];
+      for (const item of summaries) {
+        if (!item.title || !item.content) continue;
+
+        let sanitized;
+        if (typeof sanitizer === 'function') {
+          sanitized = await sanitizer(item.content);
+        } else {
+          sanitized = await this._defaultSanitize(item.content, llmCall);
+        }
+
+        results.push({
+          title: item.title,
+          content: item.content,
+          tags: item.tags || [],
+          sanitized,
+        });
+
+        // 3. 自动发布（如果启用）
+        if (autoPublish) {
+          await this.publishExperience(item.title, sanitized, {
+            tags: item.tags || [],
+          });
+        }
+      }
+
+      return results;
+    } catch (error) {
+      this.emit('error', error);
+      throw error;
+    }
+  }
+
+  // ==================== 私有辅助方法 ====================
+
+  /**
+   * 计算内容哈希（用于去重）
+   * @private
+   */
+  _hashContent(title, content) {
+    const crypto = require('crypto');
+    const normalized = `${title.trim().toLowerCase()}|${content.trim().toLowerCase()}`;
+    return crypto.createHash('sha256').update(normalized, 'utf8').digest('hex').slice(0, 16);
+  }
+
+  /**
+   * 检查经验是否已发布
+   * @private
+   */
+  _isExperienceDuplicate(hash) {
+    return this._publishedExperiences.has(hash);
+  }
+
+  /**
+   * 标记经验已发布
+   * @private
+   */
+  _markExperiencePublished(hash) {
+    this._publishedExperiences.add(hash);
+    // 限制集合大小，避免内存泄漏（保留最近 500 条）
+    if (this._publishedExperiences.size > 500) {
+      const arr = Array.from(this._publishedExperiences);
+      this._publishedExperiences = new Set(arr.slice(-500));
+    }
+  }
+
+  /**
+   * 默认脱敏函数（正则 + LLM 双重检查）
+   * @private
+   */
+  async _defaultSanitize(content, llmCall) {
+    // 1. 正则脱敏（快速处理常见模式）
+    let sanitized = content
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[邮箱]')
+      .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[IP地址]')
+      .replace(/\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?\b/g, '[URL]')
+      .replace(/\b(?:sk-|pk_|ghp_|gho_)[a-zA-Z0-9_-]{20,}\b/g, '[API密钥]')
+      .replace(/\b\d{11,}\b/g, '[手机号]')
+      .replace(/\b\d{15,18}\b/g, '[身份证号]');
+
+    // 2. LLM 深度检查（检测隐含的敏感信息）
+    if (typeof llmCall === 'function') {
+      try {
+        const prompt = `你是一个隐私保护专家。检查以下文本是否包含敏感信息，如果有则替换为占位符。
+
+敏感信息包括但不限于：
+- 人名、公司名、项目名
+- 具体的业务逻辑细节
+- 内部系统名称、数据库表名
+- 任何可能识别出特定个人或组织的信息
+
+要求：
+- 保留技术通用性（如"用户表"可以保留，但"tb_user_profile_2024"应替换为"[表名]"）
+- 保持文本可读性和技术价值
+- 如果没有敏感信息，原样返回
+
+输入文本：
+${sanitized}
+
+返回脱敏后的文本（纯文本，不要 JSON 格式）：`;
+
+        const result = await llmCall(prompt);
+        if (result && result.trim()) {
+          sanitized = result.trim();
+        }
+      } catch (_) {
+        // LLM 调用失败时使用正则脱敏结果
+      }
+    }
+
+    return sanitized;
   }
 
   // ==================== 定时任务 ====================

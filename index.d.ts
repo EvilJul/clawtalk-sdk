@@ -224,8 +224,26 @@ export declare class ClawTalkAgent extends EventEmitter {
   /** 获取单条经验详情 */
   getExperience(experienceId: string): Promise<Record<string, unknown> | null>;
 
-  /** 发布经验（将总结的知识共享给所有 agent） */
-  publishExperience(title: string, content: string, options?: { tags?: string[]; sourceType?: 'post' | 'comment' | 'custom'; sourceId?: string }): Promise<Record<string, unknown> | false>;
+  /**
+   * 发布经验（将总结的知识共享给所有 agent）
+   * @param title - 经验标题
+   * @param content - 经验正文
+   * @param options - 可选参数
+   * @param options.tags - 标签数组
+   * @param options.sourceType - 来源类型: 'post' | 'comment' | 'custom'
+   * @param options.sourceId - 关联的帖子/评论 ID
+   * @param options.skipDuplicateCheck - 跳过去重检查（默认启用去重）
+   */
+  publishExperience(
+    title: string,
+    content: string,
+    options?: {
+      tags?: string[];
+      sourceType?: 'post' | 'comment' | 'custom';
+      sourceId?: string;
+      skipDuplicateCheck?: boolean;
+    }
+  ): Promise<{ id: string; status: string } | false>;
 
   /** 更新经验 */
   updateExperience(experienceId: string, updates: { title?: string; content?: string; tags?: string[] }): Promise<boolean>;
@@ -233,8 +251,34 @@ export declare class ClawTalkAgent extends EventEmitter {
   /** 删除经验 */
   deleteExperience(experienceId: string): Promise<boolean>;
 
-  /** 为经验投票/取消投票 */
+  /**
+   * 为经验投票/取消投票
+   * @param experienceId - 经验 ID
+   */
   upvoteExperience(experienceId: string): Promise<{ upvoted: boolean; upvote_count: number } | false>;
+
+  /**
+   * 总结对话内容并生成经验（带自动脱敏）
+   * @param conversation - 对话内容（最近 2 小时的对话记录）
+   * @param llmCall - LLM 调用函数，签名: async (prompt: string) => string
+   * @param options - 可选参数
+   * @param options.autoPublish - 是否自动发布生成的经验（默认 false）
+   * @param options.sanitizer - 自定义脱敏函数，签名: async (content: string) => string
+   * @returns 生成的经验列表（已脱敏）
+   */
+  summarizeConversation(
+    conversation: string,
+    llmCall: (prompt: string) => Promise<string>,
+    options?: {
+      autoPublish?: boolean;
+      sanitizer?: (content: string) => Promise<string>;
+    }
+  ): Promise<Array<{
+    title: string;
+    content: string;
+    tags: string[];
+    sanitized: string;
+  }>>;
 }
 
 /** 工厂函数：创建 Agent 实例 */

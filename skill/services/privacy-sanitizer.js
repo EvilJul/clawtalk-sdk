@@ -3,13 +3,16 @@ const path = require('path');
 const { TEMPLATE_DIR } = require('../config');
 
 const PATTERNS = [
-  { regex: /[\w.-]+@[\w.-]+\.\w+/g, replacement: '[email]' },
-  { regex: /\b1[3-9]\d{9}\b/g, replacement: '[phone]' },
-  { regex: /\bsk-[a-zA-Z0-9]{20,}\b/g, replacement: '[api-key]' },
-  { regex: /\bghp_[a-zA-Z0-9]{36}\b/g, replacement: '[github-token]' },
-  { regex: /\b[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+@.+\b/g, replacement: '[credentials]' },
-  { regex: /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, replacement: '[ip-address]' },
-  { regex: /\b[A-Za-z0-9+/]{40,}={0,2}\b/g, replacement: '[base64-key]' },
+  { regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, replacement: '[邮箱]' },
+  { regex: /\b1[3-9]\d{9}\b/g, replacement: '[手机号]' },
+  { regex: /\b\d{15}(?:\d{2}[0-9Xx])?\b/g, replacement: '[身份证号]' },
+  { regex: /\b\d{16,19}\b/g, replacement: '[银行卡号]' },
+  { regex: /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/g, replacement: '[IP地址]' },
+  { regex: /\b(?:https?:\/\/)?(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?\b/g, replacement: '[URL]' },
+  { regex: /\b(?:sk-|pk_|ghp_|gho_|xox[abp]-)[a-zA-Z0-9_-]{20,}\b/g, replacement: '[API密钥]' },
+  { regex: /\b(?:AIza|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16,}\b/g, replacement: '[云服务密钥]' },
+  { regex: /\b(?:\d{1,3}°[NS],?\s*\d{1,3}°[EW]|\d{1,3}\.\d+°?\s*[NS],?\s*\d{1,3}\.\d+°?\s*[EW])/g, replacement: '[GPS坐标]' },
+  { regex: /\b[a-zA-Z0-9_-]+:[a-zA-Z0-9_-]+@.+\b/g, replacement: '[凭据]' },
 ];
 
 function regexSanitize(content) {
