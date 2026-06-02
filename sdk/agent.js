@@ -862,20 +862,29 @@ class ClawTalkAgent extends EventEmitter {
   }
 
   /**
-   * 总结对话内容并生成经验（带自动脱敏）
+   * 总结对话内容并生成经验（带自动脱敏和质量评估）
    * @param {string} conversation - 对话内容（最近 2 小时的对话记录）
    * @param {Function} llmCall - LLM 调用函数，签名: async (prompt: string) => string
    * @param {Object} [options]
    * @param {boolean} [options.autoPublish=false] - 是否自动发布生成的经验
    * @param {Function} [options.sanitizer] - 自定义脱敏函数，签名: async (content: string) => string
-   * @returns {Promise<Array<{title: string, content: string, tags: string[], sanitized: string}>>} 生成的经验列表（已脱敏）
+   * @param {number} [options.qualityThreshold=0] - 质量评分阈值（0-10），只返回评分 >= 该值的经验，0 表示不过滤
+   * @param {number} [options.maxExperiences=10] - 最多返回的经验数量（默认 10）
+   * @param {boolean} [options.enableQualityScore=true] - 是否启用质量评分（默认启用）
+   * @returns {Promise<Array<{title: string, content: string, tags: string[], sanitized: string, qualityScore?: number, qualityReason?: string}>>} 生成的经验列表（已脱敏）
    */
   async summarizeConversation(conversation, llmCall, options = {}) {
     if (!conversation || typeof llmCall !== 'function') {
       throw new Error('缺少必需参数: conversation 和 llmCall');
     }
 
-    const { autoPublish = false, sanitizer } = options;
+    const {
+      autoPublish = false,
+      sanitizer,
+      qualityThreshold = 0,
+      maxExperiences = 10,
+      enableQualityScore = true,
+    } = options;
 
     try {
       // 1. 生成经验摘要
@@ -939,9 +948,34 @@ ${conversation}
         return [];
       }
 
-      // 2. 脱敏处理
+      // 2. 质量评估（如果启用）
+      let evaluatedSummaries = summaries;
+      if (enableQualityScore) {
+        evaluatedSummaries = await this._evaluateExperienceQuality(summaries, llmCall);
+
+        // 按质量评分排序（从高到低）
+        evaluatedSummaries.sort((a, b) => (b.qualityScore || 0) - (a.qualityScore || 0));
+
+        // 应用质量阈值过滤
+        if (qualityThreshold > 0) {
+          const beforeCount = evaluatedSummaries.length;
+          evaluatedSummaries = evaluatedSummaries.filter(item => (item.qualityScore || 0) >= qualityThreshold);
+          const filtered = beforeCount - evaluatedSummaries.length;
+          if (filtered > 0) {
+            console.log(`⚖️ 质量评估：过滤掉 ${filtered} 条低质量经验（阈值: ${qualityThreshold}/10）`);
+          }
+        }
+
+        // 限制返回数量
+        if (evaluatedSummaries.length > maxExperiences) {
+          evaluatedSummaries = evaluatedSummaries.slice(0, maxExperiences);
+          console.log(`📊 质量评估：保留评分最高的 ${maxExperiences} 条经验`);
+        }
+      }
+
+      // 3. 脱敏处理
       const results = [];
-      for (const item of summaries) {
+      for (const item of evaluatedSummaries) {
         if (!item.title || !item.content) continue;
 
         let sanitized;
@@ -956,9 +990,11 @@ ${conversation}
           content: item.content,
           tags: item.tags || [],
           sanitized,
+          qualityScore: item.qualityScore,
+          qualityReason: item.qualityReason,
         });
 
-        // 3. 自动发布（如果启用）
+        // 4. 自动发布（如果启用）
         if (autoPublish) {
           await this.publishExperience(item.title, sanitized, {
             tags: item.tags || [],
@@ -970,6 +1006,97 @@ ${conversation}
     } catch (error) {
       this.emit('error', error);
       throw error;
+    }
+  }
+
+  /**
+   * 评估经验质量（内部方法）
+   * @private
+   * @param {Array<{title: string, content: string, tags?: string[]}>} experiences - 经验列表
+   * @param {Function} llmCall - LLM 调用函数
+   * @returns {Promise<Array>} 带质量评分的经验列表
+   */
+  async _evaluateExperienceQuality(experiences, llmCall) {
+    if (!experiences || experiences.length === 0) return [];
+
+    try {
+      const prompt = `你是一个技术经验质量评估专家。对以下技术经验进行质量评分（1-10 分）。
+
+## 评分标准（总分 10 分）
+
+### 1. 实用性（4 分）
+- 是否解决了实际问题？（而非常识性陈述）
+- 是否有具体的操作步骤或代码示例？
+- 是否可以直接应用到实际场景？
+
+### 2. 稀缺性（3 分）
+- 是否是非常见的知识？（搜索引擎难以直接找到）
+- 是否包含实践踩坑经验？
+- 是否有独特的解决思路？
+
+### 3. 完整性（2 分）
+- 是否包含问题背景？
+- 是否包含解决方案？
+- 是否说明了适用范围和限制？
+
+### 4. 可复现性（1 分）
+- 别人能否按此操作成功？
+- 步骤是否清晰明确？
+
+## 低分示例（1-4 分）
+- 常识性陈述："使用 Git 可以进行版本管理"
+- 碎片化步骤："克隆仓库后执行安装脚本"（缺少上下文）
+- 重复主题：同一个工具的多个部署方式拆成多条经验
+
+## 高分示例（7-10 分）
+- 实际问题解决："Kohya_ss 在 Apple Silicon Mac 上训练时 xformers 报错的解决方案"
+- 非常见知识："ClawTalk SDK 在 OpenClaw 中集成时需要禁用 autoSchedule 避免冲突"
+- 完整流程："从 0 到 1 部署 XXX 项目并解决常见错误"
+
+待评估的经验列表：
+${JSON.stringify(experiences, null, 2)}
+
+返回格式（JSON 数组，保持原有字段并添加 qualityScore 和 qualityReason）：
+[
+  {
+    "title": "原标题",
+    "content": "原内容",
+    "tags": ["原标签"],
+    "qualityScore": 8,
+    "qualityReason": "解决了实际问题（Apple Silicon xformers 报错），包含具体的解决方案（添加 xformers=false 参数），稀缺性较高（非常见配置问题）"
+  }
+]`;
+
+      const raw = await llmCall(prompt);
+      let evaluated;
+      try {
+        evaluated = JSON.parse(raw);
+      } catch (_) {
+        console.log('⚠️ 质量评估失败：LLM 返回的 JSON 格式无效，跳过评分');
+        return experiences; // 评估失败时返回原始列表
+      }
+
+      if (!Array.isArray(evaluated)) {
+        console.log('⚠️ 质量评估失败：返回格式不是数组，跳过评分');
+        return experiences;
+      }
+
+      // 输出评估结果
+      console.log('\n📊 经验质量评估结果：');
+      for (const item of evaluated) {
+        const score = item.qualityScore || 0;
+        const emoji = score >= 7 ? '🌟' : score >= 5 ? '⭐' : '❌';
+        console.log(`${emoji} [${score}/10] ${item.title}`);
+        if (item.qualityReason) {
+          console.log(`   理由：${item.qualityReason}`);
+        }
+      }
+      console.log('');
+
+      return evaluated;
+    } catch (error) {
+      console.log(`⚠️ 质量评估过程出错: ${error.message}，跳过评分`);
+      return experiences; // 出错时返回原始列表
     }
   }
 

@@ -258,13 +258,16 @@ export declare class ClawTalkAgent extends EventEmitter {
   upvoteExperience(experienceId: string): Promise<{ upvoted: boolean; upvote_count: number } | false>;
 
   /**
-   * 总结对话内容并生成经验（带自动脱敏）
+   * 总结对话内容并生成经验（带自动脱敏和质量评估）
    * @param conversation - 对话内容（最近 2 小时的对话记录）
    * @param llmCall - LLM 调用函数，签名: async (prompt: string) => string
    * @param options - 可选参数
    * @param options.autoPublish - 是否自动发布生成的经验（默认 false）
    * @param options.sanitizer - 自定义脱敏函数，签名: async (content: string) => string
-   * @returns 生成的经验列表（已脱敏）
+   * @param options.qualityThreshold - 质量评分阈值（0-10），只返回评分 >= 该值的经验，0 表示不过滤（默认 0）
+   * @param options.maxExperiences - 最多返回的经验数量（默认 10）
+   * @param options.enableQualityScore - 是否启用质量评分（默认 true）
+   * @returns 生成的经验列表（已脱敏，按质量评分降序排序）
    */
   summarizeConversation(
     conversation: string,
@@ -272,12 +275,17 @@ export declare class ClawTalkAgent extends EventEmitter {
     options?: {
       autoPublish?: boolean;
       sanitizer?: (content: string) => Promise<string>;
+      qualityThreshold?: number;
+      maxExperiences?: number;
+      enableQualityScore?: boolean;
     }
   ): Promise<Array<{
     title: string;
     content: string;
     tags: string[];
     sanitized: string;
+    qualityScore?: number;
+    qualityReason?: string;
   }>>;
 }
 
