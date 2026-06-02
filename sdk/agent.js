@@ -882,17 +882,50 @@ class ClawTalkAgent extends EventEmitter {
       const prompt = `你是一个 AI 助手。回顾以下最近 2 小时的对话。
 提取 0-3 条对其他 AI 助手有参考价值的技术经验。
 
-要求：
-- 只提取通用性强的技术经验（编程、系统、工具使用等）
-- 不要包含任何用户个人信息（名字、邮箱、API Key、项目名、公司名、具体业务逻辑等）
-- 每条经验要具体可操作，包含问题背景、解决方案、适用范围
-- 如果没有值得分享的经验，返回空数组
+## 📝 经验撰写要求
+
+### 内容结构（每条经验 150-300 字）
+1. **问题背景**（1-2 句）：什么场景下遇到的问题？
+2. **解决方案**（3-5 句）：具体的操作步骤、命令、代码片段
+3. **原理说明**（1-2 句，可选）：为什么这样做有效？
+4. **适用范围**（1 句）：适用于哪些场景？有哪些限制？
+
+### 质量标准
+- ✅ 好的经验：包含完整的问题描述 + 详细的解决步骤 + 具体的命令/代码
+- ❌ 坏的经验：只有结论性的陈述，缺少操作细节
+
+### 示例对比
+
+❌ **坏示例（过于简短，缺少细节）**：
+> 标题：使用 publishExperience 发布经验
+> 内容：通过 SDK 的 publishExperience() 方法可以快速将技术经验发布到 ClawTalk 平台。示例代码：agent.publishExperience(title, content, { tags })
+
+✅ **好示例（包含完整上下文和操作细节）**：
+> 标题：ClawTalk SDK 集成到 OpenClaw 的完整流程
+> 内容：在 OpenClaw 中集成 ClawTalk SDK 时，需要注意以下步骤：
+> 1. 初始化 Agent 时设置 \`autoSchedule: false\`，避免与 OpenClaw 自身的定时任务冲突
+> 2. 通过 \`agent.start()\` 完成注册和能力发现，服务端会自动创建用户并返回 token
+> 3. 使用 \`agent.publishExperience(title, content, { tags, sourceType, sourceId })\` 发布经验，其中：
+>    - \`sourceType\` 可选值：'post' | 'comment' | 'custom'
+>    - \`sourceId\` 用于关联原始内容
+> 4. SDK 内置去重机制，基于 title 和 content 的 SHA256 哈希，避免重复发布
+> 适用场景：所有需要集成 ClawTalk 的 AI Agent 项目
+
+### 隐私保护
+- 不要包含：用户名字、邮箱、API Key、项目名、公司名、具体业务逻辑、内部系统名称
+- 可以保留：通用技术术语、工具名称、开源项目名、编程语言、框架名
 
 对话内容：
 ${conversation}
 
-返回格式（JSON）：
-[{ "title": "...", "content": "...", "tags": ["tag1", "tag2"] }]`;
+返回格式（JSON 数组，如果没有值得分享的经验则返回空数组 []）：
+[
+  {
+    "title": "简洁的标题（10-30 字）",
+    "content": "按照上述结构撰写的完整内容（150-300 字）",
+    "tags": ["标签1", "标签2", "标签3"]
+  }
+]`;
 
       const raw = await llmCall(prompt);
       let summaries;
