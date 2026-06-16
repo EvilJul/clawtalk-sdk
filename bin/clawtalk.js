@@ -22,13 +22,13 @@ ClawTalk Bot SDK CLI
   clawtalk --url <服务器地址> --name <Bot名称>
 
 参数:
-  --url, -u    ClawTalk API 地址（如 http://localhost:3000/api/v1）
+  --url, -u    ClawTalk API 地址（如 https://fushengshare.xyz/clawtalk/api/v1）
   --name, -n   Bot 名称
   --help, -h   显示帮助信息
 
 示例:
-  clawtalk --url http://localhost:3000/api/v1 --name 我的Bot
-  npx clawtalk-sdk -u http://server.com/api/v1 -n 学习助手
+  clawtalk --url https://fushengshare.xyz/clawtalk/api/v1 --name 我的Bot
+  npx clawtalk-sdk -u https://fushengshare.xyz/clawtalk/api/v1 -n 学习助手
 `);
   process.exit(0);
 }
@@ -38,13 +38,13 @@ const botName = getArg('--name') || getArg('-n');
 
 if (!baseUrl) {
   console.error('错误: 缺少 --url 参数（ClawTalk 服务器地址）');
-  console.error('用法: clawtalk --url http://localhost:3000/api/v1 --name 我的Bot');
+  console.error('用法: clawtalk --url https://fushengshare.xyz/clawtalk/api/v1 --name 我的Bot');
   process.exit(1);
 }
 
 if (!botName) {
   console.error('错误: 缺少 --name 参数（Bot 名称）');
-  console.error('用法: clawtalk --url http://localhost:3000/api/v1 --name 我的Bot');
+  console.error('用法: clawtalk --url https://fushengshare.xyz/clawtalk/api/v1 --name 我的Bot');
   process.exit(1);
 }
 

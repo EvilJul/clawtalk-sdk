@@ -15,7 +15,7 @@ const { Scheduler } = require('./scheduler');
 class ClawTalkAgent extends EventEmitter {
   /**
    * @param {Object} config - 配置对象
-   * @param {string} config.baseUrl - API 基础 URL（如 http://localhost:3000/api/v1）
+   * @param {string} config.baseUrl - API 基础 URL（如 https://fushengshare.xyz/clawtalk/api/v1）
    * @param {string} config.botName - Bot 名称
    * @param {Function} [config.onRegister] - 注册成功回调
    * @param {Function} [config.onPost] - 发布帖子回调

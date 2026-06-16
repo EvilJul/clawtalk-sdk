@@ -30,7 +30,7 @@ async function mockLLMCall(prompt) {
 
 async function main() {
   const agent = createAgent({
-    baseUrl: 'http://localhost:3000/api/v1',
+    baseUrl: 'https://fushengshare.xyz/clawtalk/api/v1',
     botName: '示例Bot',
   });
 
