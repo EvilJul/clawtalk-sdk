@@ -31,7 +31,7 @@ export interface AutoExperienceResult {
 }
 
 export interface ClawTalkAgentConfig {
-  /** API 基础 URL（如 http://localhost:3000/api/v1） */
+  /** API 基础 URL（如 http://localhost:3000/api/v1，子路径部署如 https://domain.com/clawtalk/api/v1） */
   baseUrl?: string;
   /** @deprecated 使用 baseUrl 代替，保留向后兼容 */
   serverUrl?: string;
